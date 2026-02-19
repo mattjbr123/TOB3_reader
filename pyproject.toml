@@ -9,7 +9,7 @@ dependencies = [
     # https://github.com/david-caro/python-autosemver/issues/56
     "setuptools < 81",
 ]
-name = "mypackage"
+name = "tob3reader"
 dynamic = ["version"]
 authors = [{ name = "John Doe", email = "johdoe@ceh.ac.uk" }]
 description = "A minimal setup for a template package."
@@ -25,10 +25,10 @@ dev = [
 ]
 
 [tool.setuptools.dynamic]
-version = { attr = "mypackage.__version__" }
+version = { attr = "tob3reader.__version__" }
 
 [tool.pytest.ini_options]
-addopts = "--cov=mypackage"
+addopts = "--cov=tob3reader"
 markers = [
     "slow: Marks slow tests",
 ]
@@ -39,7 +39,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-omit = ["*__init__.py", "src/mypackage/__main__.py"]
+omit = ["*__init__.py", "src/tob3reader/__main__.py"]
 
 [tool.ruff]
 line-length = 120
@@ -49,3 +49,6 @@ select = ["F", "E", "W", "A", "PLC", "PLE", "PLW", "I", "N816", "ANN001", "ANN20
 
 [tool.ruff.lint.flake8-type-checking]
 strict = true
+
+[tool.uv.extra-build-dependencies]
+tob3reader = ["setuptools < 81"]

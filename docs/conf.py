@@ -6,13 +6,13 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-import mypackage
+import tob3reader
 
 project = "My Project"
 project_copyright = "2024, UKCEH"
 author = "UKCEH"
 
-release = mypackage.__version__
+release = tob3reader.__version__
 version = release
 
 # -- General configuration ---------------------------------------------------

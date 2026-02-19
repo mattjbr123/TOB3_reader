@@ -1,7 +1,7 @@
-mypackage
+tob3reader
 =========
 
 .. toctree::
    :maxdepth: 4
 
-   mypackage
+   tob3reader

@@ -1,6 +1,6 @@
 import pytest
 
-from mypackage.module import add_int
+from tob3reader.module import add_int
 
 
 def test_errors() -> None:

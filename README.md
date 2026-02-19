@@ -1,9 +1,9 @@
 # Python Project Template
 
-[![tests badge](https://github.com/NERC-CEH/python-template/actions/workflows/pipeline.yml/badge.svg)](https://github.com/NERC-CEH/python-template/actions)
-[![docs badge](https://github.com/NERC-CEH/python-template/actions/workflows/deploy-docs.yml/badge.svg)](https://nerc-ceh.github.io/python-template/)
+[![tests badge](https://github.com/NERC-CEH/TOB3_reader/actions/workflows/pipeline.yml/badge.svg)](https://github.com/NERC-CEH/TOB3_reader/actions)
+[![docs badge](https://github.com/NERC-CEH/TOB3_reader/actions/workflows/deploy-docs.yml/badge.svg)](https://nerc-ceh.github.io/TOB3_reader/)
 
-[Read the docs!](https://nerc-ceh.github.io/python-template)
+[Read the docs!](https://nerc-ceh.github.io/TOB3_reader)
 
 This repository is a template for a basic Python project. Included here is:
 
@@ -47,14 +47,14 @@ remove`.
 
 ### Making it Your Own
 
-This repo has a single package in the `./src/...` path called `mypackage` (creative I know). Change this to the name of your package and update it in:
+This repo has a single package in the `./src/...` path called `tob3reader` (creative I know). Change this to the name of your package and update it in:
 
 * `docs/conf.py`
 * `src/**/*.py`
 * `tests/**/*.py`
 * `pyproject.toml`
 
-To make thing move a bit faster, use the script `./rename-package.sh` to rename all references of `mypackage` to whatever you like. For example:
+To make thing move a bit faster, use the script `./rename-package.sh` to rename all references of `tob3reader` to whatever you like. For example:
 
 ```console
 ./rename-package.sh "acoolnewname"
@@ -69,7 +69,7 @@ cd docs
 make apidoc
 ```
 
-To keep your documentation in sync with the package name. You may need to delete a file called `mypackage.rst` from `./docs/sources/...`
+To keep your documentation in sync with the package name. You may need to delete a file called `tob3reader.rst` from `./docs/sources/...`
 
 ### Deploying Docs to GitHub Pages
 
@@ -88,7 +88,7 @@ make apidoc
 
 This will populate `./docs/sources/...` with `*.rst` files for each Python module, which may be included into the documentation.
 
-Documentation can then be built locally by running `make html`, or found on the [GitHub Deployment](https://nerc-ceh.github.io/python-template).
+Documentation can then be built locally by running `make html`, or found on the [GitHub Deployment](https://nerc-ceh.github.io/TOB3_reader).
 
 ### Run the Tests
 

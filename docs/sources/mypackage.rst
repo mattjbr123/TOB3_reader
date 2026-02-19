@@ -1,13 +1,13 @@
-mypackage package
+tob3reader package
 =================
 
 Submodules
 ----------
 
-mypackage.module module
+tob3reader.module module
 -----------------------
 
-.. automodule:: mypackage.module
+.. automodule:: tob3reader.module
    :members:
    :undoc-members:
    :show-inheritance:
@@ -15,7 +15,7 @@ mypackage.module module
 Module contents
 ---------------
 
-.. automodule:: mypackage
+.. automodule:: tob3reader
    :members:
    :undoc-members:
    :show-inheritance:
