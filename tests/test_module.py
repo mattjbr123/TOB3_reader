@@ -1,15 +1,20 @@
 import pytest
 
-from tob3reader.module import add_int
+from tob3reader.module import ftc
 
 
 def test_errors() -> None:
+#    with pytest.raises(TypeError):
+#        add_int(1, "3")
     with pytest.raises(TypeError):
-        add_int(1, "3")
-    with pytest.raises(TypeError):
-        add_int({1, 2}, 5)
+        ftc(fakedatapath)
+    with pytest.raises(FileNotFoundError):
+        ftc(fakedatapath + 'bla')
+    
+        
+
 
 
 @pytest.mark.parametrize("x,y,expected", [[1, 2, 3], [-4, 10, 6], [1000, 100, 1100]])
 def test_result(x: int, y: int, expected: int) -> None:
-    assert add_int(x, y) == expected
+#    assert add_int(x, y) == expected
