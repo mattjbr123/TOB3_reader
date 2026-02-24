@@ -9,6 +9,7 @@ dependencies = [
     # https://github.com/david-caro/python-autosemver/issues/56
     "ipython>=9.10.0",
     "numpy>=2.4.2",
+    "pytest>=8.4.1",
     "setuptools < 81",
 ]
 name = "tob3reader"

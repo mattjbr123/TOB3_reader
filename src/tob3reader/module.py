@@ -1,5 +1,8 @@
+import os
+
+
 def ftc(filepath: str) -> str:
-    """Checks the file type is TOB1 or TOB3
+    """Checks and returns file type if TOB1 or TOB3, errors otherwise
 
     Parameters
     ----------
@@ -15,11 +18,45 @@ def ftc(filepath: str) -> str:
 
     with open(filepath, "rb") as testfile:
         topline = str(testfile.readline())
-        tobtype = topline.split(",")[3:-1]
+        tobtype = topline[3:7]
     if not tobtype in ("TOB1", "TOB3"):
         raise TypeError(filepath + " should be TOB1 or TOB3 format, not " + tobtype)
 
     return tobtype
+
+
+def read_header(filepath: str) -> (list[str], int, int):
+
+    tobtype = ftc(filepath)
+    if tobtype == "TOB1":
+        nhlines = 5
+    elif tobtype == "TOB3":
+        nhlines = 6
+
+    with open(filepath, "rb") as infile:
+        headerlines = []
+        for nline in range(nhlines):
+            line = str(infile.readline()).strip("b").strip("'")
+            headerlines.append(line)
+        datapos = infile.tell()
+        filesize = infile.seek(0, os.SEEK_END)
+
+    return headerlines, datapos, filesize
+
+
+def read_body(filepath: str) -> list:
+
+    tobtype = ftc(filepath)
+    if tobtype == "TOB1":
+        nhlines = 5
+    elif tobtype == "TOB3":
+        nhlines = 6
+
+    with open(filepath, "rb") as infile:
+        alllines = infile.readlines()
+        body = alllines[nhlines:]
+
+    return body
 
 
 def read_tob1(filepath: str):
@@ -32,6 +69,26 @@ def read_tob1(filepath: str):
     :rtype: TYPE
 
     """
+
+    headerlines, datapos, filesize = read_header(filepath)
+    datatypes = headerlines[-1][:-4].split(",")
+    datatypes = [datatype.strip('"') for datatype in datatypes]
+    ncols = len(datatypes)
+    linelength = 0
+    bytelens = []
+    for datatype in datatypes:
+        print(datatype)
+        if datatype == "ULONG":
+            bytelen = 8
+            linelength += bytelen
+            bytelens.append(bytelen)
+        elif datatype == "FP2":
+            bytelen = 2
+            linelength += bytelen
+            bytelens.append(bytelen)
+    nlines = (filesize - datapos) / linelength
+
+    return bytelens, linelength, nlines
 
 
 def read_tob3(filepath: str):

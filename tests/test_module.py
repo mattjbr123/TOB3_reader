@@ -4,17 +4,19 @@ from tob3reader.module import ftc
 
 
 def test_errors() -> None:
-#    with pytest.raises(TypeError):
-#        add_int(1, "3")
+    #    with pytest.raises(TypeError):
+    #        add_int(1, "3")
     with pytest.raises(TypeError):
-        ftc(fakedatapath)
+        ftc("tests/fakedata")
     with pytest.raises(FileNotFoundError):
-        ftc(fakedatapath + 'bla')
-    
-        
+        ftc("tests/fakedata" + "bla")
 
 
+def test_result() -> None:
+    assert ftc("tests/tob1data") == "TOB1"
+    assert ftc("tests/tob3data") == "TOB3"
 
-@pytest.mark.parametrize("x,y,expected", [[1, 2, 3], [-4, 10, 6], [1000, 100, 1100]])
-def test_result(x: int, y: int, expected: int) -> None:
+
+# @pytest.mark.parametrize("x,y,expected", [[1, 2, 3], [-4, 10, 6], [1000, 100, 1100]])
+# def test_result(x: int, y: int, expected: int) -> None:
 #    assert add_int(x, y) == expected

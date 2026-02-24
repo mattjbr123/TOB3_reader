@@ -693,6 +693,7 @@ dependencies = [
     { name = "autosemver" },
     { name = "ipython" },
     { name = "numpy" },
+    { name = "pytest" },
     { name = "setuptools" },
 ]
 
@@ -723,6 +724,7 @@ requires-dist = [
     { name = "autosemver" },
     { name = "ipython", specifier = ">=9.10.0" },
     { name = "numpy", specifier = ">=2.4.2" },
+    { name = "pytest", specifier = ">=8.4.1" },
     { name = "setuptools", specifier = "<81" },
 ]
 
