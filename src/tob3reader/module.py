@@ -1,6 +1,7 @@
 import os
 import sys
 import numpy as np
+import pandas as pd
 
 
 def ftc(filepath: str) -> str:
@@ -65,7 +66,6 @@ def read_body(filepath: str) -> list:
 def decode_fp2(data: bytes) -> float:
     """Decode a Campbell Scientific FP2 two-byte float."""
 
-    print("Decoding FP2")
     raw = int.from_bytes(data, byteorder="big")
 
     sign = (raw >> 15) & 0x01  # bit 15
@@ -78,10 +78,37 @@ def decode_fp2(data: bytes) -> float:
     return value
 
 
+def decode_fp4(data: bytes) -> float:
+    """Decode a Campbell Scientific FP4 four-byte float."""
+
+    print("Decoding FP4")
+    raw = int.from_bytes(data, byteorder="big")
+
+    sign = (raw >> 31) & 0x01  # bit 31
+    exponent = (raw >> 24) & 0x7F  # bits 30-24
+    mantissa = (raw >> 0) & 0xFFFFFF  # bits 23-0
+
+    value = mantissa * (2**exponent)  ## EXPONENT MAY BE NEGATIVE. DOCS UNCLEAR
+    if sign:
+        value = -value
+    return value
+
+
 def decode_ulong(data: bytes) -> int:
-    """Deode a ULONG (unsigned, 4-byte) little-endian integer"""
-    print("Decoding ULONG")
+    """Decode a ULONG (unsigned, 4-byte) little-endian integer"""
     return int.from_bytes(data, byteorder="little")
+
+
+def decode_long(data: bytes) -> int:
+    """Decode a LONG (signed, 4-byte) little-endian integer"""
+    return int.from_bytes(data, byteorder="little", signed=True)
+
+
+def decode_time(data: int):
+    """Translate the time information from the TOB1 or TOB3 files into
+    something human readable"""
+    pass
+    return
 
 
 def read_tob1(filepath: str):
@@ -103,7 +130,7 @@ def read_tob1(filepath: str):
     bytelens = []
     for datatype in datatypes:
         print(datatype)
-        if datatype == "ULONG":
+        if datatype == "ULONG" or datatype == "LONG" or datatype == "FP4":
             bytelen = 4
             linelength += bytelen
             bytelens.append(bytelen)
@@ -116,7 +143,7 @@ def read_tob1(filepath: str):
     nlines = (filesize - datapos) / linelength
     assert nlines % 1 == 0  # check it's a whole number
     nlines = int(nlines)
-    data = np.zeros((nlines, ncols))
+    datastore = np.zeros((nlines, ncols))
 
     # read in the data element by element
     # first put all the binary date into memory
@@ -125,23 +152,30 @@ def read_tob1(filepath: str):
     # remove the header
     data = allfile[datapos:]
     startbyte = 0
+    totaldatapoints = datastore.size
     for line in range(nlines):
+        progresspc = float(line) * len(bytelens) / totaldatapoints * 100
+        print("Progress: " + str(progresspc) + "%")
         for b in range(len(bytelens)):
             bytelen = bytelens[b]
             datatype = datatypes[b]
             # read the next x bytes and put it in the empty data array
             element = data[startbyte : startbyte + bytelen]
             startbyte += bytelen
-            print(element)
             if datatype == "ULONG":
                 value = decode_ulong(element)
+            elif datatype == "LONG":
+                value = decode_long(element)
+            elif datatype == "FP4":
+                value = decode_fp4(element)
             elif datatype == "FP2":
                 value = decode_fp2(element)
-            print(value)
-        if line == 1:
-            sys.exit()
+            else:
+                raise TypeError("Unsupported datatype: " + datatype)
+            datastore[line, b] = value
+    datastore = pd.DataFrame(datastore)
 
-    return bytelens, linelength, nlines
+    return datastore
 
 
 def read_tob3(filepath: str):
