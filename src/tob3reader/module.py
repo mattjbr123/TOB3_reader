@@ -1,10 +1,10 @@
 import os
-import sys
+import csv
 import numpy as np
 import pandas as pd
 import datetime as dt
-import struct
-from bitstring import ConstBitStream
+from .decoders import *
+from .constants import bytelengths
 
 
 def ftc(filepath: str) -> str:
@@ -31,7 +31,7 @@ def ftc(filepath: str) -> str:
     return tobtype
 
 
-def read_header(filepath: str) -> (list[str], int, int, int, str):
+def read_header(filepath: str) -> (list[str], int, int, str):
 
     tobtype = ftc(filepath)
     if tobtype == "TOB1":
@@ -44,121 +44,13 @@ def read_header(filepath: str) -> (list[str], int, int, int, str):
         for nline in range(nhlines):
             line = str(infile.readline()).strip("b").strip("'").strip("\\r\\n")
             headerlines.append(line)
-        if tobtype == "TOB3":
-            binheader = infile.read(12)
-        else:
-            binheader = None
         datapos = infile.tell()
         filesize = infile.seek(0, os.SEEK_END)
-    print(headerlines)
 
-    return headerlines, binheader, datapos, filesize, tobtype
-
-
-def read_body(filepath: str) -> list:
-
-    tobtype = ftc(filepath)
-    if tobtype == "TOB1":
-        nhlines = 5
-    elif tobtype == "TOB3":
-        nhlines = 6
-
-    with open(filepath, "rb") as infile:
-        alllines = infile.readlines()
-        body = alllines[nhlines:]
-
-    return body
+    return headerlines, datapos, filesize, tobtype
 
 
-def decode_fp2(data: bytes) -> float:
-    """Decode a Campbell Scientific FP2 two-byte float."""
-
-    raw = int.from_bytes(data, byteorder="big")
-
-    sign = (raw >> 15) & 0x01  # bit 15
-    exponent = (raw >> 13) & 0x03  # bits 14-13
-    mantissa = (raw >> 0) & 0x1FFF  # bits 12-0
-
-    value = mantissa * (10**-exponent)
-    if sign:
-        value = -value
-    return value
-
-
-def decode_fp4(data: bytes) -> float:
-    """Decode a Campbell Scientific FP4 four-byte float."""
-
-    print("Decoding FP4")
-    raw = int.from_bytes(data, byteorder="big")
-
-    sign = (raw >> 31) & 0x01  # bit 31
-    exponent = (raw >> 24) & 0x7F  # bits 30-24
-    mantissa = (raw >> 0) & 0xFFFFFF  # bits 23-0
-
-    value = mantissa * (2**exponent)
-    if sign:
-        value = -value
-    return value
-
-
-def decode_IEEE4(data: bytes) -> float:
-    """Decode a standard IEEE4 four-byte float."""
-
-    value = struct.unpack_from(">f", data)[0]
-    return value
-
-
-def decode_IEEE8(data: bytes) -> float:
-    """Decode a standard IEEE8 eight-byte float."""
-
-    value = struct.unpack_from(">d", data)[0]
-    return value
-
-
-def decode_ulong(data: bytes) -> int:
-    """Decode a ULONG (unsigned, 4-byte) little-endian integer"""
-    return int.from_bytes(data, byteorder="little")
-
-
-def decode_long(data: bytes) -> int:
-    """Decode a LONG (signed, 4-byte) little-endian integer"""
-    return int.from_bytes(data, byteorder="little", signed=True)
-
-
-def decode_int4(data: bytes) -> int:
-    """Decode Campbell Scientific INT4 packed byte.
-    Bits 0-3: site number (0-15)
-    Bit 4: omit flag (measurements being omitted from calculations)
-    """
-    return int.from_bytes(data, signed=True)
-
-
-def decode_time(data: pd.DataFrame, origin: dt.datetime = dt.datetime(1990, 1, 1)) -> pd.DataFrame:
-    """Translate the time information from the TOB1 or TOB3 files into
-    something human readable"""
-    if "SECONDS" and "NANOSECONDS" in list(data.columns):
-        data.index = pd.to_datetime(
-            data.loc[:, "SECONDS"] + data.loc[:, "NANOSECONDS"] / 1e9,
-            unit="s",
-            origin=origin,
-        )
-    elif "SECONDS" in list(data.columns):
-        data.index = pd.to_datetime(
-            data.loc[:, "SECONDS"],
-            unit="s",
-            origin=origin,
-        )
-    else:
-        raise IndexError(
-            "At least one of SECONDS and NANOSECONDS not "
-            + "present in data. Cannot establish unique time coords."
-            + "Data headers are: "
-            + str(list(data.columns))
-        )
-    return data
-
-
-def read_tob1(filepath: str, outpath: str = ".") -> pd.DataFrame:
+def read_tob1(filepath: str, outpath: str = ".") -> None:
     """Reads in TOB1 file and outputs as pd.DataFrame
 
     :param filepath: path to the input TOB1 datafile
@@ -169,26 +61,14 @@ def read_tob1(filepath: str, outpath: str = ".") -> pd.DataFrame:
 
     """
 
-    headerlines, binheader, datapos, filesize, tobtype = read_header(filepath)
+    headerlines, datapos, filesize, tobtype = read_header(filepath)
     datatypes = headerlines[-1].split(",")
     datatypes = [datatype.strip('"') for datatype in datatypes]
     names = headerlines[1].split(",")
     names = [name.strip('"') for name in names]
     ncols = len(datatypes)
-    linelength = 0
-    bytelens = []
-    for datatype in datatypes:
-        print(datatype)
-        if datatype in ["ULONG", "LONG", "FP4", "IEEE4", "IEEE4B", "INT4"]:
-            bytelen = 4
-        elif datatype == "FP2":
-            bytelen = 2
-        elif datatype in ["IEEE8", "IEEE8B"]:
-            bytelen = 8
-        else:
-            raise TypeError("Unsupported datatype: " + datatype)
-        linelength += bytelen
-        bytelens.append(bytelen)
+    bytelens = [bytelengths[datatype] for datatype in datatypes]
+    linelength = np.asarray(bytelens).sum()
     nlines = (filesize - datapos) / linelength
     assert nlines % 1 == 0  # check it's a whole number
     nlines = int(nlines)
@@ -212,35 +92,20 @@ def read_tob1(filepath: str, outpath: str = ".") -> pd.DataFrame:
             # read the next x bytes and put it in the empty data array
             element = data[startbyte : startbyte + bytelen]
             startbyte += bytelen
-            if datatype == "ULONG":
-                value = decode_ulong(element)
-            elif datatype == "LONG":
-                value = decode_long(element)
-            elif datatype == "FP4":
-                value = decode_fp4(element)
-            elif datatype == "FP2":
-                value = decode_fp2(element)
-            elif datatype in ["IEEE4", "IEEE4B"]:
-                value = decode_IEEE4(element)
-            elif datatype in ["IEEE8", "IEEE8B"]:
-                value = decode_IEEE8(element)
-            elif datatype == "INT4":
-                value = decode_int4(element)
-            else:
-                raise TypeError("Unsupported datatype: " + datatype)
+            value = decode(element, datatype)
             datastore[line, b] = value
     datastore = pd.DataFrame(datastore)
     datastore.columns = names
     datastore = decode_time(datastore)
-    # datastore = process_nans(datastore)
+    datastore = process_nans(datastore)
 
-    splits = split30(datastore)
+    splits = split30(datastore, tobtype)
     to_files(splits, headerlines[:-1], tobtype, outpath)
 
-    return splits
+    return
 
 
-def read_tob3(filepath: str, outpath: str = ".") -> pd.DataFrame:
+def read_tob3(filepath: str, outpath: str = ".") -> None:
     """Reads in TOB3 file and outputs as pd.DataFrame
 
     :param filepath: path to the input TOB1 datafile
@@ -251,13 +116,32 @@ def read_tob3(filepath: str, outpath: str = ".") -> pd.DataFrame:
 
     """
 
-    headerlines, binheader, datapos, filesize, tobtype = read_header(filepath)
+    headerlines, datapos, filesize, tobtype = read_header(filepath)
     datatypes = headerlines[-1].split(",")
     datatypes = [datatype.strip(" ").strip('"') for datatype in datatypes]
     filedata = headerlines[1].split(",")
     filedata = [filedatum.strip(" ").strip('"') for filedatum in filedata]
     framesize = int(filedata[2])  # size of each "frame" in the file
     datasize = framesize - 16  # size of the actual data in each "frame"
+    recordinterval = filedata[1].split(" ")
+    if "NSEC" in recordinterval:
+        nsecjump = 1 * int(recordinterval[0])
+    elif "USEC" in recordinterval:
+        nsecjump = 1e3 * int(recordinterval[0])
+    elif "MSEC" in recordinterval:
+        nsecjump = 1e6 * int(recordinterval[0])
+    elif "SEC" in recordinterval:
+        nsecjump = 1e9 * int(recordinterval[0])
+
+    nanosunit = filedata[5]  # unit that the nanoseconds info is encoded as
+    if nanosunit == "SecMsec":
+        nanosmultiplier = 1e6
+    elif nanosunit == "Sec100Usec":
+        nanosmultiplier = 1e5
+    elif nanosunit == "Sec10Usec":
+        nanosmultiplier = 1e4
+    elif nanosunit == "SecUsec":
+        nanosmultiplier = 1e3
     names = headerlines[2].split(",")
     names = [name.strip(" ").strip('"') for name in names]
     names.reverse()
@@ -265,26 +149,11 @@ def read_tob3(filepath: str, outpath: str = ".") -> pd.DataFrame:
     names.append("SECONDS")
     names.reverse()
     ncols = len(datatypes)
-    linelength = 0
-    bytelens = []
-    for datatype in datatypes:
-        print(datatype)
-        if datatype in ["ULONG", "LONG", "FP4", "IEEE4", "IEEE4B", "INT4"]:
-            bytelen = 4
-        elif datatype == "FP2":
-            bytelen = 2
-        elif datatype in ["IEEE8", "IEEE8B"]:
-            bytelen = 8
-        else:
-            raise TypeError("Unsupported datatype: " + datatype)
-        linelength += bytelen
-        bytelens.append(bytelen)
+    bytelens = [bytelengths[datatype] for datatype in datatypes]
+    linelength = np.asarray(bytelens).sum()
     nlines_per_frame = datasize / linelength  # usually 1 line per "frame"
-    nframes = (filesize - datapos + 12) / (framesize)
+    nframes = (filesize - datapos) / (framesize)
     nlines = nframes * nlines_per_frame
-    print(nlines_per_frame)
-    print(nframes)
-    print(nlines)
     assert nlines % 1 == 0  # check it's a whole number
     nlines = int(nlines)
     datastore = np.zeros((nlines, ncols + 2))
@@ -297,11 +166,10 @@ def read_tob3(filepath: str, outpath: str = ".") -> pd.DataFrame:
     # the timestamp of the first record and the interval OF EACH FRAME is
     # stored in the FRAME headers. So that pandas can easily decode the time of
     # each record, we'll add a timestamp to each record
-    frame1secs = decode_ulong(binheader[:4])
-    frame1nanos = decode_ulong(binheader[4:8]) * 1e5
-    # remove the header
     data = allfile[datapos:]
-    startbyte = 0
+    frame1secs = decode(data[:4], "ULONG")
+    frame1nanos = decode(data[4:8], "ULONG") * nanosmultiplier
+    startbyte = 12
     recordsecs = frame1secs
     recordnanos = frame1nanos
     for line in range(nlines):
@@ -314,22 +182,7 @@ def read_tob3(filepath: str, outpath: str = ".") -> pd.DataFrame:
             # read the next x bytes and put it in the empty data array
             element = data[startbyte : startbyte + bytelen]
             startbyte += bytelen
-            if datatype == "ULONG":
-                value = decode_ulong(element)
-            elif datatype == "LONG":
-                value = decode_long(element)
-            elif datatype == "FP4":
-                value = decode_fp4(element)
-            elif datatype == "FP2":
-                value = decode_fp2(element)
-            elif datatype in ["IEEE4", "IEEE4B"]:
-                value = decode_IEEE4(element)
-            elif datatype in ["IEEE8", "IEEE8B"]:
-                value = decode_IEEE8(element)
-            elif datatype == "INT4":
-                value = decode_int4(element)
-            else:
-                raise TypeError("Unsupported datatype: " + datatype)
+            value = decode(element, datatype)
             datastore[line, b + 2] = value
         datastore[line, 0] = recordsecs
         datastore[line, 1] = recordnanos
@@ -338,8 +191,8 @@ def read_tob3(filepath: str, outpath: str = ".") -> pd.DataFrame:
         if line % nlines_per_frame == 0:
             startbyte += 4  # skip the frame footer
             # obtain new timestamp info from next frame header
-            recordsecs = decode_ulong(data[startbyte : startbyte + 4])
-            recordnanos = decode_ulong(data[startbyte + 4 : startbyte + 8]) * 1e5
+            recordsecs = decode(data[startbyte : startbyte + 4], "ULONG")
+            recordnanos = decode(data[startbyte + 4 : startbyte + 8], "ULONG") * nanosmultiplier
             if recordsecs + recordnanos / 1e9 < datastore[line, 0] + datastore[line, 1] / 1e9:
                 print("Invalid timestamp encountered, probably end of data")
                 print("Last valid line: " + str(line))
@@ -350,14 +203,13 @@ def read_tob3(filepath: str, outpath: str = ".") -> pd.DataFrame:
                 break
             startbyte += 12  # move to the next frame's data
         # otherwise increment the timestamp by the frequency in the frame head
-        # assuming 20Hz for now...
         else:
             # increment the timestamp
             if recordnanos == 950000000:
                 recordnanos = 0
                 recordsecs += 1
             else:
-                recordnanos += 50000000
+                recordnanos += nsecjump
 
     # trim trailing zeroes if data ended before file
     datastore = datastore[: line + 1, :]
@@ -371,7 +223,7 @@ def read_tob3(filepath: str, outpath: str = ".") -> pd.DataFrame:
     splits = split30(datastore, tobtype)
     to_files(splits, headerlines[:-1], tobtype, outpath)
 
-    return datastore
+    return
 
 
 def split30(data: pd.DataFrame, tobtype: str) -> list[pd.DataFrame]:
@@ -457,14 +309,35 @@ def to_files(
                 "TOA5_" + siteno + "." + sitename + "_" + auxname + "_" + timestamp + ".dat",
             )
         with open(outpath, mode="w") as outfile:
+            linecount = 1
             for line in headers:
-                outfile.write(line + "\r\n")
+                linecopy = line
+                if tobtype == "TOB1":
+                    linecopy = linecopy.replace("TOB1", "TOA5")
+                    linecopy = linecopy.replace('"SECONDS","NANOSECONDS","RECORD",', "")
+                    linecopy = linecopy.replace('"SECONDS","NANOSECONDS","RN",', "")
+                    linecopy = linecopy.replace('"","","",', "")
+                elif tobtype == "TOB3":
+                    linecopy = linecopy.replace("TOB3", "TOA5")
+                if tobtype == "TOB3" and linecount == 2:
+                    pass
+                else:
+                    outfile.write(linecopy + "\r\n")
+                linecount += 1
         print("Outputting to file: " + outpath)
         if tobtype == "TOB1":
             fmt = "%.2f"
         elif tobtype == "TOB3":
             fmt = "%.8f"
-        ds.to_csv(outpath, index=None, header=None, float_format=fmt, mode="a")  # change nan format to "NAN"
+        ds.to_csv(
+            outpath,
+            index=None,
+            header=None,
+            float_format=fmt,
+            na_rep='"NAN"',
+            quoting=csv.QUOTE_NONE,
+            mode="a",
+        )
 
     return
 
@@ -479,6 +352,8 @@ def process_nans(data: pd.DataFrame) -> pd.DataFrame:
     :rtype: TYPE
 
     """
+    data = data.where(data != -8190)
+    return data
 
 
 # def add_int(x: int, y: int) -> int:
